@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 
 import hashlib
+from cryptography.fernet import Fernet
 import psycopg2
 import psycopg2.extras
 
@@ -25,17 +26,26 @@ print('Start fetching data...')
 sqs = boto3.client('sqs', endpoint_url=endpoint_url, region_name=region_name)
 message_bodies = receive_messages(sqs, Queue_url, 1)
 
-## hide PII
-def mask_pii(device_id, ip):
+# Generate a secret key for encryption (keep this key secure and don't share it)
+secret_key = Fernet.generate_key()
+
+def mask_pii(var):
     # Concatenate the device_id and ip to create a unique identifier
-    identifier = f"{device_id}_{ip}"
-    # Create a hash of the identifier using SHA-256
-    hash_value = hashlib.sha256(identifier.encode()).hexdigest()
-    # Use the first 8 characters of the hash as the pseudonym for device_id
-    masked_device_id = hash_value[:8]
-    # Use the last 8 characters of the hash as the pseudonym for ip
-    masked_ip = hash_value[-8:]
-    return masked_device_id, masked_ip
+    identifier = var
+    # Create an instance of the Fernet cipher with the secret key
+    cipher = Fernet(secret_key)
+    # Encrypt the identifier
+    encrypted_identifier = cipher.encrypt(identifier.encode())
+    return encrypted_identifier
+
+def recover_pii(encrypted_identifier):
+    # Create an instance of the Fernet cipher with the secret key
+    cipher = Fernet(secret_key)
+
+    # Decrypt the encrypted identifier to recover the original PII
+    decrypted_identifier = cipher.decrypt(encrypted_identifier).decode()
+
+    return decrypted_identifier
 
 
 df = pd.DataFrame(columns=['user_id', 'device_type', 'masked_ip', 'masked_device_id', 'locale', 'app_version', 'create_date'])
@@ -43,9 +53,8 @@ idx = 0
 for x in message_bodies:
     try:
         x['create_date'] = datetime.today().date()
-        masked_x = mask_pii(x['device_id'], x['ip'])
-        x['masked_device_id'] = masked_x[0]
-        x['masked_ip'] = masked_x[1]
+        x['masked_device_id'] = mask_pii(x['device_id'])
+        x['masked_ip'] = mask_pii(x['ip'])
         df.loc[idx] = x
         idx += 1
     except:
