@@ -1,0 +1,10 @@
+hostname = 'localhost'
+database = 'postgres'
+username = 'postgres'
+password = 'postgres'
+table_name = 'user_logins'
+port = '5432'
+
+endpoint_url = 'http://localhost:4566'
+region_name = 'us-east-1'
+Queue_url = 'http://localhost:4566/000000000000/login-queue'
